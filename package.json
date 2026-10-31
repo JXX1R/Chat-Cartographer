@@ -1,0 +1,9 @@
+{
+  "name": "chat-cartographer",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "start": "vite --host 0.0.0.0", "build": "vite build", "preview": "vite preview --host 0.0.0.0" },
+  "dependencies": { "vite": "^6.0.0" },
+  "devDependencies": {}
+}
+
