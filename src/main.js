@@ -1,5 +1,3 @@
-import routeData from '../data/routes.json';
-
 const countries = [
   ['japan','Japan','🇯🇵','Tokyo, Kyoto, and the islands',36.2,138.3], ['italy','Italy','🇮🇹','Rome, Florence, and the coast',41.9,12.5],
   ['brazil','Brazil','🇧🇷','Rio, the Amazon, and beyond',-14.2,-51.9], ['new-zealand','New Zealand','🇳🇿','Aotearoa, mountains, and fjords',-40.9,174.9],
@@ -45,7 +43,7 @@ function renderChoices() {
     const count = state.votes[choice.id] || 0; const card = el('div', `choice-card ${state.resolved && state.history.at(-1)?.choice === choice.id ? 'winning' : ''}`);
     const icon = el('span', 'choice-icon', choice.icon); const info = el('span', 'choice-info'); info.append(el('strong', '', choice.label), el('small', '', choice.description));
     const tally = el('span', 'choice-tally'); tally.append(el('strong', '', String(count)), el('small', '', 'VOTES'));
-    card.append(el('span', 'choice-number', `0${i + 1}`), icon, info, tally); const meter = el('span', 'choice-meter'); meter.style.width = `${total ? (count / total) * 100 : 0}%`; card.append(meter); list.append(card);
+    card.append(el('span', 'choice-number', String(i + 1).padStart(2, '0')), icon, info, tally); const meter = el('span', 'choice-meter'); meter.style.width = `${total ? (count / total) * 100 : 0}%`; card.append(meter); list.append(card);
   });
   if ($('#voter-count')) $('#voter-count').textContent = `${total} ${total === 1 ? 'explorer has' : 'explorers have'} voted`;
   const button = $('#resolve-button'); if (button) button.innerHTML = state.resolved ? 'Open next round <span>↗</span>' : 'Reveal the route <span>↗</span>';
