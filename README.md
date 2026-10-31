@@ -11,7 +11,7 @@ npm install
 npm start
 ```
 
-Open the local URL printed by Vite. The app works in demo mode without Twitch credentials: use the sample chat feed, type `!vote 1`, `!vote 2`, or `!vote 3`, and select **Reveal the route**. Demo explorers also cast sample votes automatically. The streamer setup page lets you change the theme, expedition title, and voting timer. The app saves expedition progress in browser local storage.
+Open the local URL printed by Vite. The app works in demo mode without Twitch credentials: type `!vote 1`, `!vote 2`, or `!vote 3` to add a manual sample vote, then select **Reveal the route**. Demo mode does not generate automatic sample chat or votes. The streamer setup page lets you change the theme, expedition title, and voting timer. The app saves expedition progress in browser local storage.
 
 To preconfigure the app owner's public Twitch Client ID for local development, copy `.env.example` to `.env.local` and set `VITE_TWITCH_CLIENT_ID`. Restart Vite after changing it. Do not put a Twitch Client Secret in a `VITE_` variable; Vite embeds these values in public browser code.
 
