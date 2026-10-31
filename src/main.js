@@ -84,7 +84,7 @@ function renderInteractiveGlobe(canvas) {
   ctx.strokeStyle='rgba(184,225,219,.19)';ctx.lineWidth=.7;
   for(let lat=-60;lat<=60;lat+=30){let drawing=false;ctx.beginPath();for(let lon=-180;lon<=180;lon+=3){const p=globePoint(lat,lon,cx,cy,r);if(p.z>0){if(!drawing){ctx.moveTo(p.x,p.y);drawing=true;}else ctx.lineTo(p.x,p.y);}else drawing=false;}ctx.stroke();}
   for(let lon=-180;lon<180;lon+=30){let drawing=false;ctx.beginPath();for(let lat=-88;lat<=88;lat+=2){const p=globePoint(lat,lon,cx,cy,r);if(p.z>0){if(!drawing){ctx.moveTo(p.x,p.y);drawing=true;}else ctx.lineTo(p.x,p.y);}else drawing=false;}ctx.stroke();}
-  landShapes.forEach(shape=>{ctx.beginPath();let active=false,started=false;for(const [lon,lat] of shape){const p=globePoint(lat,lon,cx,cy,r);if(p.z>0){if(!active){ctx.moveTo(p.x,p.y);active=true;started=true;}else ctx.lineTo(p.x,p.y);}else active=false;}if(started){ctx.closePath();ctx.fillStyle='#83a976';ctx.fill();ctx.strokeStyle='rgba(202,220,165,.5)';ctx.lineWidth=.8;ctx.stroke();}});
+  landShapes.forEach(shape=>drawGlobeLand(ctx,shape,cx,cy,r));
   countries.forEach(c=>{const p=globePoint(c.lat,c.lon,cx,cy,r);if(p.z<=0)return;const visited=state.history.some(h=>h.id===c.id),current=state.history.at(-1)?.id===c.id;ctx.beginPath();ctx.arc(p.x,p.y,current?6:visited?4.3:3.5,0,Math.PI*2);ctx.fillStyle=current?'#fff1c4':visited?'#a7ddbf':'#e6ad65';ctx.shadowColor=current?'#fff1c4':'#ffca70';ctx.shadowBlur=current?14:8;ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='#fff0c5';ctx.lineWidth=1;ctx.stroke();});
   const shine=ctx.createLinearGradient(cx-r,cy-r,cx+r*.8,cy+r*.3);shine.addColorStop(0,'rgba(255,255,255,.22)');shine.addColorStop(.38,'rgba(255,255,255,0)');shine.addColorStop(1,'rgba(0,0,0,.42)');ctx.fillStyle=shine;ctx.fillRect(cx-r,cy-r,r*2,r*2);ctx.restore();
   ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle='rgba(198,235,222,.52)';ctx.lineWidth=1.2;ctx.stroke();
@@ -96,6 +96,35 @@ function renderInteractiveGlobe(canvas) {
     canvas.addEventListener('keydown',e=>{const step=e.shiftKey?18:8;if(e.key==='ArrowLeft')globeView.longitude-=step;else if(e.key==='ArrowRight')globeView.longitude+=step;else if(e.key==='ArrowUp')globeView.latitude=Math.min(70,globeView.latitude+step);else if(e.key==='ArrowDown')globeView.latitude=Math.max(-70,globeView.latitude-step);else if(e.key==='Home'){globeView.longitude=-15;globeView.latitude=12;}else return;e.preventDefault();renderInteractiveGlobe(canvas);});
     if(globeView.observer)globeView.observer.disconnect();globeView.observer=new ResizeObserver(()=>renderInteractiveGlobe(canvas));globeView.observer.observe(canvas);
   }
+}
+function drawGlobeLand(ctx,shape,cx,cy,r){
+  const points=[];
+  for(let i=0;i<shape.length;i++){
+    const a=shape[i],b=shape[(i+1)%shape.length],steps=Math.max(1,Math.ceil(Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]))/2));
+    for(let j=0;j<steps;j++){const t=j/steps;points.push(globePoint(a[1]+(b[1]-a[1])*t,a[0]+(b[0]-a[0])*t,cx,cy,r));}
+  }
+  const clipped=[];
+  for(let i=0;i<points.length;i++){
+    const prev=points[(i+points.length-1)%points.length],cur=points[i],prevIn=prev.z>=0,curIn=cur.z>=0;
+    if(prevIn!==curIn){const t=prev.z/(prev.z-cur.z);clipped.push({x:prev.x+(cur.x-prev.x)*t,y:prev.y+(cur.y-prev.y)*t,z:0});}
+    if(curIn)clipped.push(cur);
+  }
+  if(clipped.length<3)return;
+  const interior=clipped.filter(p=>p.z>0);if(!interior.length)return;const center=interior.reduce((sum,p)=>({x:sum.x+p.x/interior.length,y:sum.y+p.y/interior.length}),{x:0,y:0});
+  const horizonArc=(a,b)=>{
+    const angleA=Math.atan2(a.y-cy,a.x-cx),angleB=Math.atan2(b.y-cy,b.x-cx);
+    let short=angleB-angleA;while(short>Math.PI)short-=Math.PI*2;while(short<-Math.PI)short+=Math.PI*2;
+    const long=short>0?short-Math.PI*2:short+Math.PI*2;
+    const midA=angleA+short/2,midB=angleA+long/2;
+    const distA=Math.hypot(cx+r*Math.cos(midA)-center.x,cy+r*Math.sin(midA)-center.y),distB=Math.hypot(cx+r*Math.cos(midB)-center.x,cy+r*Math.sin(midB)-center.y);
+    const delta=distA<=distB?short:long,n=Math.max(2,Math.ceil(Math.abs(delta)*r/5));
+    for(let k=1;k<=n;k++){const angle=angleA+delta*k/n;ctx.lineTo(cx+r*Math.cos(angle),cy+r*Math.sin(angle));}
+  };
+  const onHorizon=p=>Math.abs(p.z)<1e-7;
+  ctx.beginPath();ctx.moveTo(clipped[0].x,clipped[0].y);
+  for(let i=1;i<clipped.length;i++){if(onHorizon(clipped[i-1])&&onHorizon(clipped[i]))horizonArc(clipped[i-1],clipped[i]);else ctx.lineTo(clipped[i].x,clipped[i].y);}
+  if(onHorizon(clipped.at(-1))&&onHorizon(clipped[0]))horizonArc(clipped.at(-1),clipped[0]);else ctx.lineTo(clipped[0].x,clipped[0].y);
+  ctx.closePath();ctx.fillStyle='#83a976';ctx.fill();ctx.strokeStyle='rgba(202,220,165,.5)';ctx.lineWidth=.8;ctx.stroke();
 }
 function addMapNode(stage, x, y, label, active, discovered, you = false) { const node = el('div', `map-node ${active ? 'active' : ''} ${discovered ? 'discovered' : ''} ${you ? 'you-are-here' : ''}`); node.style.left = `${x}%`; node.style.top = `${y}%`; node.append(el('span', 'node-pin', you ? '✳' : '')); const text = el('span', 'node-label', label); node.append(text); if (you) node.append(el('span', 'node-you', 'YOU ARE HERE')); stage.append(node); }
 function render() {
