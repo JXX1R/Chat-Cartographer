@@ -1,13 +1,23 @@
 import routeData from '../data/routes.json';
 
+const countries = [
+  ['japan','Japan','🇯🇵','Tokyo, Kyoto, and the islands',36.2,138.3], ['italy','Italy','🇮🇹','Rome, Florence, and the coast',41.9,12.5],
+  ['brazil','Brazil','🇧🇷','Rio, the Amazon, and beyond',-14.2,-51.9], ['new-zealand','New Zealand','🇳🇿','Aotearoa, mountains, and fjords',-40.9,174.9],
+  ['morocco','Morocco','🇲🇦','Marrakech, Atlas peaks, and desert',31.8,-7.1], ['iceland','Iceland','🇮🇸','Waterfalls, hot springs, and auroras',64.9,-19.0],
+  ['south-korea','South Korea','🇰🇷','Seoul, markets, and the coast',35.9,127.8], ['peru','Peru','🇵🇪','Andes, Cusco, and the Sacred Valley',-9.2,-75.0],
+  ['kenya','Kenya','🇰🇪','Nairobi, savanna, and the Rift Valley',-0.02,37.9], ['greece','Greece','🇬🇷','Athens, islands, and ancient sites',39.1,21.8]
+].map(([id,name,icon,description,lat,lon])=>({id,name,icon,description,lat,lon,x:(lon+180)/360*100,y:(90-lat)/180*100}));
+const countryWorld = {name:'Where to?',start:'home',rounds:Array.from({length:3},(_,i)=>({prompt:['Pick a country for the next trip. Where should the streamer go?','The journey continues. Which country should be next?','One more destination: where should chat send the streamer?'][i],choices:countries.map(c=>({id:c.id,label:c.name,icon:c.icon,description:c.description,destination:c.id}))})),locations:{home:{name:'Earth',discovery:'A whole world of possibilities. Chat chooses the next country to visit.',coordinates:'PLANET EARTH',x:50,y:50},...Object.fromEntries(countries.map(c=>[c.id,{name:c.name,discovery:`${c.description}. Chat sent the streamer to ${c.name}!`,coordinates:`${c.lat.toFixed(1)}° · ${c.lon.toFixed(1)}°`,x:c.x,y:c.y}]))}};
+
 const configuredClientId = import.meta.env.VITE_TWITCH_CLIENT_ID || '';
 const params = new URLSearchParams(location.search);
 const overlayMode = params.has('overlay');
 const saved = loadState();
-const state = { theme: saved.theme || 'archive', title: saved.title || '', round: saved.round || 0, votes: {}, voters: new Map(), history: saved.history || [], duration: saved.duration || 30, seconds: 0, resolved: false, accessToken: '', broadcasterId: '', userId: '', ws: null, socketSession: '', timer: null, activity: [] };
+const validHistory = (saved.history || []).filter(item => countries.some(c => c.id === item.id)).slice(-3);
+const state = { theme: saved.theme || 'archive', title: saved.title === 'The Sunken Archive' ? '' : (saved.title || ''), round: Math.min(validHistory.length, 2), votes: {}, voters: new Map(), history: validHistory, duration: saved.duration || 30, seconds: 0, resolved: false, accessToken: '', broadcasterId: '', userId: '', ws: null, socketSession: '', timer: null, activity: [] };
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, content) => { const n = document.createElement(tag); if (cls) n.className = cls; if (content !== undefined) n.textContent = content; return n; };
-const world = () => routeData.themes[state.theme];
+const world = () => countryWorld;
 const currentLocation = () => world().locations[state.history.at(-1)?.id || world().start];
 const roundData = () => world().rounds[Math.min(state.round, world().rounds.length - 1)];
 function loadState() { try { return JSON.parse(localStorage.getItem('cartographer-state') || '{}'); } catch { return {}; } }
@@ -42,38 +52,23 @@ function renderChoices() {
 }
 function renderMap() {
   const stage = $('#map-stage'); if (!stage) return; stage.replaceChildren(); const loc = currentLocation();
-  stage.append(el('div', 'map-wash wash-one'), el('div', 'map-wash wash-two'));
-  const paths = el('svg', 'map-paths'); paths.setAttribute('viewBox', '0 0 100 100'); paths.setAttribute('preserveAspectRatio', 'none');
-  const trail = state.history.slice(0, 3); const points = [{ x: 50, y: 78 }, ...trail.map(item => world().locations[item.id]).filter(Boolean)];
-  if (points.length === 1) { paths.innerHTML = '<path class="faint-path" d="M26 53 Q18 39 15 20 M50 43 Q49 32 42 20 M74 54 Q79 39 82 21"/>'; }
-  else { const anchor = { x: 50, y: 78 }; trail.forEach((item, i) => { const dest = world().locations[item.id]; if (dest) paths.innerHTML += `<path class="journey-path" d="M${i ? points[i].x : anchor.x} ${i ? points[i].y : anchor.y} Q${(i ? points[i].x : anchor.x) + (dest.x - (i ? points[i].x : anchor.x)) / 2} ${Math.min(i ? points[i].y : anchor.y, dest.y) - 6} ${dest.x} ${dest.y}"/>`; }); if (state.round < 3) paths.innerHTML += `<path class="dashed-path" d="M${loc.x} ${loc.y} Q${(loc.x + 50) / 2} ${loc.y - 10} 50 42"/>`; }
-  stage.append(paths);
-  if (state.history.length) {
-    trail.forEach((item, i) => { const node = world().locations[item.id]; if (node) addMapNode(stage, node.x, node.y, node.name.toUpperCase(), i === trail.length - 1, true); });
-  }
-  if (state.history.length < world().rounds.length) {
-    const options = world().rounds[state.history.length].choices;
-    const line = state.history.at(-1) ? world().locations[state.history.at(-1).id] : { x: 50, y: 78 };
-    options.forEach(choice => {
-      const destination = world().locations[choice.destination]; if (!destination) return;
-      paths.innerHTML += `<path class="dashed-path" d="M${line.x} ${line.y} Q${(line.x + destination.x) / 2} ${Math.min(line.y, destination.y) - 5} ${destination.x} ${destination.y}"/>`;
-    });
-    options.forEach(choice => { const destination = world().locations[choice.destination]; if (destination) addMapNode(stage, destination.x, destination.y, destination.name.toUpperCase(), false, false); });
-  }
-  addMapNode(stage, loc.x, loc.y, loc.name.toUpperCase(), true, true, true);
+  const globe = el('div','world-globe'); globe.setAttribute('role','img'); globe.setAttribute('aria-label','Three-dimensional globe showing country destinations');
+  globe.innerHTML = `<div class="globe-grid"></div><svg class="globe-land" viewBox="0 0 360 180" aria-hidden="true"><path d="M22 38l17-13 28 3 12 12-8 13-14 1-5 13-14 2-4 18-10 8-8-13 3-16-10-11 5-17zm54 46 15 7 9 18-4 22-12 24-8-13 2-21-9-15zm47-62 22-11 20 4 9 12-12 8-16-3-11 11-14-4zm32 38 17-7 17 8 9 23-8 20-3 26-13 23-11-10 1-22-11-13-4-20-12-13zm43-46 29-8 30 5 19 12 33 3 17 16-9 14-25-4-15 12-22-4-12 13-23-2-13 14-14-7 3-21-16-11 7-18zm42 74 17 7 8 17-9 19-15-6-9-15z"/></svg><div class="globe-shine"></div>`;
+  const markers=el('div','globe-markers'); countries.forEach(c=>{const m=el('span',`globe-marker ${state.history.some(h=>h.id===c.id)?'visited':''} ${state.history.at(-1)?.id===c.id?'current':''}`);m.style.left=`${c.x}%`;m.style.top=`${c.y}%`;m.title=c.name;markers.append(m);}); globe.append(markers); stage.append(globe);
+  const trail = state.history.slice(-3); if(trail.length){const path=trail.map(h=>h.label).join(' → ');stage.append(el('div','globe-journey',`✦ ${path}`));}
   if ($('#map-caption-text')) $('#map-caption-text').textContent = loc.discovery;
   if ($('#map-coordinates')) $('#map-coordinates').textContent = loc.coordinates;
   const title = state.title || world().name;
   if ($('#expedition-title')) $('#expedition-title').textContent = title;
   if ($('#crumb-name')) $('#crumb-name').textContent = title.toUpperCase();
   if ($('#round-number')) $('#round-number').textContent = String(Math.min(state.round + 1, 3)).padStart(2, '0');
-  if ($('#round-prompt')) $('#round-prompt').textContent = state.round >= 3 && state.resolved ? 'Expedition complete! Your community made this map.' : roundData().prompt;
+  if ($('#round-prompt')) $('#round-prompt').textContent = state.round >= 3 && state.resolved ? 'Trip complete! Chat chose the destinations.' : roundData().prompt;
 }
 function addMapNode(stage, x, y, label, active, discovered, you = false) { const node = el('div', `map-node ${active ? 'active' : ''} ${discovered ? 'discovered' : ''} ${you ? 'you-are-here' : ''}`); node.style.left = `${x}%`; node.style.top = `${y}%`; node.append(el('span', 'node-pin', you ? '✳' : '')); const text = el('span', 'node-label', label); node.append(text); if (you) node.append(el('span', 'node-you', 'YOU ARE HERE')); stage.append(node); }
 function render() {
   renderMap(); renderChoices(); if ($('#connection-label')) $('#connection-label').textContent = state.ws?.readyState === WebSocket.OPEN ? 'TWITCH CONNECTED' : 'DEMO MODE';
   if ($('#voting-open')) $('#voting-open').textContent = state.resolved ? 'ROUTE REVEALED' : 'VOTING OPEN';
-  if ($('#route-preview')) $('#route-preview').innerHTML = world().rounds.flatMap((r, i) => r.choices.map((c, j) => `<div class="route-row"><span>0${i + 1}.${j + 1}</span><strong>${escapeHtml(c.label)}</strong><small>${escapeHtml(c.description)}</small></div>`)).join('');
+  if ($('#route-preview')) $('#route-preview').innerHTML = countries.map((c, i) => `<div class="route-row"><span>${String(i + 1).padStart(2, '0')}</span><strong>${escapeHtml(c.icon)} ${escapeHtml(c.name)}</strong><small>${escapeHtml(c.description)}</small></div>`).join('');
   if ($('#overlay-url')) $('#overlay-url').textContent = `${location.origin}${location.pathname}?overlay`;
   if ($('#setup-title')) $('#setup-title').value = state.title || world().name;
   if ($('#theme-select')) $('#theme-select').value = state.theme;
@@ -115,14 +110,14 @@ async function startTwitch(token) {
 function handleOAuth() { const hash = new URLSearchParams(location.hash.slice(1)); const token = hash.get('access_token'); if (token) { history.replaceState(null, '', location.pathname + location.search); startTwitch(token); } }
 function bind() {
   document.querySelectorAll('.nav-item').forEach(b => b.addEventListener('click', () => { document.querySelectorAll('.nav-item,.view').forEach(n => n.classList.remove('active')); b.classList.add('active'); $(`#${b.dataset.view}-view`).classList.add('active'); }));
-  $('#vote-form').addEventListener('submit', e => { e.preventDefault(); const text = $('#vote-input').value.trim(); const match = text.match(/^!vote\s+(\S+)/i); if (match) vote('you', match[1]); else setToast('Vote with !vote 1, !vote 2, or !vote 3'); $('#vote-input').value = ''; });
+  $('#vote-form').addEventListener('submit', e => { e.preventDefault(); const text = $('#vote-input').value.trim(); const match = text.match(/^!vote\s+(\S+)/i); if (match) vote('you', match[1]); else setToast('Vote with !vote followed by a number from 1 to 10'); $('#vote-input').value = ''; });
   $('#resolve-button').addEventListener('click', resolveRound); $('#reset-button').addEventListener('click', reset);
-  $('#save-setup').addEventListener('click', () => { state.title = $('#setup-title').value.trim() || world().name; state.theme = $('#theme-select').value; state.duration = Number($('#round-duration').value); reset(); setToast('Expedition settings saved'); });
+  $('#save-setup').addEventListener('click', () => { state.title = $('#setup-title').value.trim() || world().name; state.duration = Number($('#round-duration').value); reset(); setToast('Trip settings saved'); });
   $('#connect-twitch').addEventListener('click', connectTwitch);
   $('#overlay-link').addEventListener('click', () => window.open(`${location.pathname}?overlay`, 'cartographer-overlay', 'width=1200,height=760'));
   $('#preview-overlay').addEventListener('click', () => window.open(`${location.pathname}?overlay`, 'cartographer-overlay', 'width=1200,height=760'));
   $('#copy-overlay').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('#overlay-url').textContent); setToast('Overlay URL copied'); } catch { setToast('Copy the overlay URL above'); } });
-  $('#download-routes').addEventListener('click', () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(routeData, null, 2)], { type: 'application/json' })); a.download = 'routes.json'; a.click(); URL.revokeObjectURL(a.href); });
+  $('#download-routes').addEventListener('click', () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({title:world().name,countries,rounds:world().rounds.map(r=>({prompt:r.prompt,choices:r.choices}))}, null, 2)], { type: 'application/json' })); a.download = 'countries.json'; a.click(); URL.revokeObjectURL(a.href); });
 }
 function init() {
   const savedClientId = localStorage.getItem('cartographer-client-id'); if ($('#client-id')) { $('#client-id').value = configuredClientId || savedClientId || ''; if (configuredClientId) { $('#client-id').readOnly = true; $('#client-id').title = 'Configured by the app owner'; } }
