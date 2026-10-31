@@ -15,6 +15,7 @@ function persist() { localStorage.setItem('cartographer-state', JSON.stringify({
 function setToast(message) { const toast = $('#toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
 function totalVotes() { return Object.values(state.votes).reduce((a, b) => a + b, 0); }
 function chatLine(name, text, accent = '') { const row = el('div', 'chat-line'); const dot = el('span', `chat-dot ${accent}`); dot.textContent = name.slice(0, 1).toUpperCase(); row.append(dot, el('strong', '', name), el('span', '', text)); const feed = $('#chat-feed'); if (!feed) return; feed.append(row); while (feed.children.length > 5) feed.firstElementChild.remove(); feed.scrollTop = feed.scrollHeight; }
+function setDemoVoteMode(enabled) { const form = $('#vote-form'); const hint = $('.chat-hint'); if (form) { form.hidden = !enabled; form.style.display = enabled ? '' : 'none'; } if (hint) { hint.hidden = !enabled; hint.style.display = enabled ? '' : 'none'; } }
 function vote(user, choice, source = 'demo') {
   if (state.resolved) return;
   const options = roundData().choices;
@@ -94,6 +95,7 @@ function connectTwitch() {
   const redirect = location.origin + location.pathname; const url = new URL('https://id.twitch.tv/oauth2/authorize'); url.search = new URLSearchParams({ client_id: clientId, redirect_uri: redirect, response_type: 'token', scope: 'user:read:chat', force_verify: 'true' }); location.href = url.toString();
 }
 async function startTwitch(token) {
+  setDemoVoteMode(false);
   state.accessToken = token; const clientId = configuredClientId || localStorage.getItem('cartographer-client-id'); const channel = localStorage.getItem('cartographer-channel');
   $('#client-id') && ($('#client-id').value = clientId || ''); $('#channel-name') && ($('#channel-name').value = channel || '');
   const status = $('#twitch-status'); if (status) status.innerHTML = '<i></i><span>Connecting to Twitch…</span>';
@@ -103,12 +105,12 @@ async function startTwitch(token) {
     const channelRes = await fetch(`https://api.twitch.tv/helix/users?login=${encodeURIComponent(channel)}`, { headers }); if (!channelRes.ok) throw new Error('Could not look up the channel.'); const channelData = await channelRes.json(); if (!channelData.data.length) throw new Error('Channel not found.'); state.broadcasterId = channelData.data[0].id;
     const ws = new WebSocket('wss://eventsub.wss.twitch.tv/ws'); state.ws = ws;
     ws.addEventListener('message', async event => { const msg = JSON.parse(event.data); const type = msg.metadata?.message_type;
-      if (type === 'session_welcome') { state.socketSession = msg.payload.session.id; try { const sub = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'channel.chat.message', version: '1', condition: { broadcaster_user_id: state.broadcasterId, user_id: state.userId }, transport: { method: 'websocket', session_id: state.socketSession } }) }); if (!sub.ok) { const err = await sub.json(); throw new Error(err.message || 'EventSub subscription failed.'); } if (status) status.innerHTML = '<i class="connected"></i><span>Connected — votes from Twitch chat are live.</span>'; $('#connection-label').textContent = 'TWITCH CONNECTED'; setToast(`Listening to ${channel}'s chat`); } catch (e) { if (status) status.innerHTML = `<i></i><span>${escapeHtml(e.message)}</span>`; }
+      if (type === 'session_welcome') { state.socketSession = msg.payload.session.id; try { const sub = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'channel.chat.message', version: '1', condition: { broadcaster_user_id: state.broadcasterId, user_id: state.userId }, transport: { method: 'websocket', session_id: state.socketSession } }) }); if (!sub.ok) { const err = await sub.json(); throw new Error(err.message || 'EventSub subscription failed.'); } if (status) status.innerHTML = '<i class="connected"></i><span>Connected — votes from Twitch chat are live.</span>'; $('#connection-label').textContent = 'TWITCH CONNECTED'; setDemoVoteMode(false); setToast(`Listening to ${channel}'s chat`); } catch (e) { setDemoVoteMode(true); if (status) status.innerHTML = `<i></i><span>${escapeHtml(e.message)}</span>`; }
       } else if (type === 'notification' && msg.payload.subscription.type === 'channel.chat.message') { const e = msg.payload.event; const text = e.message.text.trim(); const match = text.match(/^!vote\s+(\S+)/i); if (match) vote(e.chatter_user_name, match[1], 'twitch'); }
       else if (type === 'session_reconnect') { const next = new WebSocket(msg.payload.session.reconnect_url); state.ws = next; }
     });
-    ws.addEventListener('close', () => { if (status) status.innerHTML = '<i></i><span>Twitch connection closed. Reconnect from setup.</span>'; $('#connection-label').textContent = 'DEMO MODE'; });
-  } catch (e) { if (status) status.innerHTML = `<i></i><span>${escapeHtml(e.message)}</span>`; }
+    ws.addEventListener('close', () => { if (status) status.innerHTML = '<i></i><span>Twitch connection closed. Reconnect from setup.</span>'; $('#connection-label').textContent = 'DEMO MODE'; setDemoVoteMode(true); });
+  } catch (e) { setDemoVoteMode(true); if (status) status.innerHTML = `<i></i><span>${escapeHtml(e.message)}</span>`; }
 }
 function handleOAuth() { const hash = new URLSearchParams(location.hash.slice(1)); const token = hash.get('access_token'); if (token) { history.replaceState(null, '', location.pathname + location.search); startTwitch(token); } }
 function bind() {
