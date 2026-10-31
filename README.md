@@ -26,9 +26,10 @@ Each Twitch username can contribute one vote per round. The manual demo vote for
 
 ## Countries and globe
 
-The app offers ten destinations: Japan, Italy, Brazil, New Zealand, Morocco, Iceland, South Korea, Peru, Kenya, and Greece. Votes select the next country for the streamer to visit. The map displays visited destinations on a shaded 3D-style globe. The OBS overlay currently keeps its state local to that page; use a window capture of the dashboard for a live view.
+The app offers ten destinations: Japan, Italy, Brazil, New Zealand, Morocco, Iceland, South Korea, Peru, Kenya, and Greece. Votes select the next country for the streamer to visit. The map displays visited destinations on an interactive globe. Drag to rotate it, use the arrow keys to turn it, or click a visible country marker to cast a demo vote. In a live Twitch session, the marker click prompts viewers to vote in chat instead. The OBS overlay currently keeps its state local to that page; use a window capture of the dashboard for a live view.
 
 ## Hosting
 
 Vercel builds this Vite app into `dist/`. The Twitch OAuth redirect URL must exactly match the deployed HTTPS origin.
+
 
