@@ -16,7 +16,7 @@ function setToast(message) { const toast = $('#toast'); toast.textContent = mess
 function totalVotes() { return Object.values(state.votes).reduce((a, b) => a + b, 0); }
 function chatLine(name, text, accent = '') { const row = el('div', 'chat-line'); const dot = el('span', `chat-dot ${accent}`); dot.textContent = name.slice(0, 1).toUpperCase(); row.append(dot, el('strong', '', name), el('span', '', text)); const feed = $('#chat-feed'); if (!feed) return; feed.append(row); while (feed.children.length > 5) feed.firstElementChild.remove(); feed.scrollTop = feed.scrollHeight; }
 function vote(user, choice, source = 'demo') {
-  if (state.resolved) { if (source === 'twitch') chatLine(user, 'The next vote is opening soon', 'gold'); return; }
+  if (state.resolved) return;
   const options = roundData().choices;
   let selected = options.find(c => c.id === choice || c.id.startsWith(choice));
   if (!selected) { const n = Number(String(choice).replace(/\D/g, '')); if (n > 0) selected = options[n - 1]; }
@@ -79,17 +79,11 @@ function render() {
   if (overlayMode) document.body.classList.add('overlay-mode');
 }
 function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
-function simulate() {
-  const bots = ['mossyboots', 'starlit_sam', 'tinycompass', 'pebble_pilot', 'moonmoth']; let i = 0;
-  const run = () => { if (state.resolved) return; const c = roundData().choices[Math.floor(Math.random() * 3)]; vote(bots[i++ % bots.length], c.id); if (i < 6 && !state.resolved) setTimeout(run, 2200 + Math.random() * 1700); };
-  run();
-}
 function resolveRound() {
   if (state.resolved) { if (state.history.length >= 3) { state.round = 0; state.history = []; } else state.round++; state.votes = {}; state.voters.clear(); state.resolved = false; state.seconds = 0; persist(); render(); startTimer(); return; }
   const choices = roundData().choices; const top = Math.max(...choices.map(c => state.votes[c.id] || 0));
   const winner = top > 0 ? choices.filter(c => (state.votes[c.id] || 0) === top)[Math.floor(Math.random() * choices.filter(c => (state.votes[c.id] || 0) === top).length)] : choices[Math.floor(Math.random() * choices.length)];
   state.history.push({ id: winner.destination, choice: winner.id, label: winner.label, votes: state.votes[winner.id] || 0 }); state.resolved = true; clearInterval(state.timer); persist(); render();
-  chatLine('Cartographer', `Chat chose ${winner.label} — ${world().locations[winner.destination].discovery}`, 'gold');
 }
 function startTimer() { clearInterval(state.timer); state.seconds = 0; state.timer = setInterval(() => { if (state.resolved) return; state.seconds++; const left = Math.max(0, state.duration - state.seconds); const t = $('#countdown'); if (t) t.textContent = `00:${String(left).padStart(2, '0')}`; const bar = $('#timer-progress'); if (bar) bar.style.width = `${100 * left / state.duration}%`; if (!left) resolveRound(); }, 1000); }
 function reset() { state.round = 0; state.history = []; state.votes = {}; state.voters.clear(); state.resolved = false; state.activity = []; $('#chat-feed')?.replaceChildren(); persist(); render(); startTimer(); }
@@ -132,7 +126,7 @@ function init() {
   const savedClientId = localStorage.getItem('cartographer-client-id'); if ($('#client-id')) { $('#client-id').value = configuredClientId || savedClientId || ''; if (configuredClientId) { $('#client-id').readOnly = true; $('#client-id').title = 'Configured by the app owner'; } }
   if (overlayMode) { document.querySelector('.sidebar')?.remove(); document.querySelector('.topbar')?.remove(); document.querySelectorAll('.page-heading,.map-caption,.page-footer').forEach(n => n.remove()); document.querySelector('.map-card')?.classList.add('overlay-map-card'); document.querySelector('.content-grid')?.classList.add('overlay-grid'); $('#map-view')?.classList.add('active'); }
   else { bind(); }
-  render(); chatLine('Cartographer', 'Welcome, explorers! Cast your vote with !vote 1, 2 or 3.', 'gold'); startTimer(); handleOAuth(); if (!new URLSearchParams(location.hash.slice(1)).has('access_token')) simulate();
+  render(); startTimer(); handleOAuth();
 }
 init();
 
