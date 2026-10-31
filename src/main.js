@@ -13,6 +13,15 @@ const overlayMode = params.has('overlay');
 const saved = loadState();
 const validHistory = (saved.history || []).filter(item => countries.some(c => c.id === item.id)).slice(-3);
 const state = { theme: saved.theme || 'archive', title: saved.title === 'The Sunken Archive' ? '' : (saved.title || ''), round: Math.min(validHistory.length, 2), votes: {}, voters: new Map(), history: validHistory, duration: saved.duration || 30, seconds: 0, resolved: false, accessToken: '', broadcasterId: '', userId: '', ws: null, socketSession: '', timer: null, activity: [] };
+const globeView = { longitude: -15, latitude: 12, canvas: null, observer: null };
+const landShapes = [
+  [[-168,65],[-145,70],[-128,57],[-124,48],[-110,48],[-100,28],[-84,9],[-78,9],[-82,25],[-97,30],[-105,48],[-125,55],[-140,60]],
+  [[-73,10],[-55,5],[-44,-8],[-35,-15],[-48,-35],[-68,-56],[-76,-35],[-80,-5]],
+  [[-12,36],[-5,50],[12,55],[30,50],[42,42],[35,30],[45,12],[40,-5],[31,-32],[18,-35],[10,-5],[-2,5],[-16,20]],
+  [[28,70],[55,74],[85,72],[110,68],[140,60],[160,54],[155,42],[138,34],[122,20],[105,8],[88,8],[70,22],[55,28],[42,42]],
+  [[112,-11],[132,-10],[154,-18],[150,-38],[130,-44],[115,-34]],
+  [[-52,82],[-28,78],[-20,66],[-38,58],[-54,62],[-62,72]]
+];
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, content) => { const n = document.createElement(tag); if (cls) n.className = cls; if (content !== undefined) n.textContent = content; return n; };
 const world = () => countryWorld;
@@ -50,9 +59,7 @@ function renderChoices() {
 }
 function renderMap() {
   const stage = $('#map-stage'); if (!stage) return; stage.replaceChildren(); const loc = currentLocation();
-  const globe = el('div','world-globe'); globe.setAttribute('role','img'); globe.setAttribute('aria-label','Three-dimensional globe showing country destinations');
-  globe.innerHTML = `<div class="globe-grid"></div><svg class="globe-land" viewBox="0 0 360 180" aria-hidden="true"><path d="M22 38l17-13 28 3 12 12-8 13-14 1-5 13-14 2-4 18-10 8-8-13 3-16-10-11 5-17zm54 46 15 7 9 18-4 22-12 24-8-13 2-21-9-15zm47-62 22-11 20 4 9 12-12 8-16-3-11 11-14-4zm32 38 17-7 17 8 9 23-8 20-3 26-13 23-11-10 1-22-11-13-4-20-12-13zm43-46 29-8 30 5 19 12 33 3 17 16-9 14-25-4-15 12-22-4-12 13-23-2-13 14-14-7 3-21-16-11 7-18zm42 74 17 7 8 17-9 19-15-6-9-15z"/></svg><div class="globe-shine"></div>`;
-  const markers=el('div','globe-markers'); countries.forEach(c=>{const m=el('span',`globe-marker ${state.history.some(h=>h.id===c.id)?'visited':''} ${state.history.at(-1)?.id===c.id?'current':''}`);m.style.left=`${c.x}%`;m.style.top=`${c.y}%`;m.title=c.name;markers.append(m);}); globe.append(markers); stage.append(globe);
+  const canvas = el('canvas','globe-canvas'); canvas.setAttribute('role','application'); canvas.setAttribute('aria-label','Interactive 3D globe. Drag to rotate. Use arrow keys to turn the globe. Click a country marker to vote in demo mode.'); canvas.tabIndex = 0; stage.append(canvas,el('div','globe-instructions','DRAG TO ROTATE · ARROW KEYS TO TURN · CLICK A COUNTRY TO VOTE IN DEMO MODE')); renderInteractiveGlobe(canvas);
   const trail = state.history.slice(-3); if(trail.length){const path=trail.map(h=>h.label).join(' → ');stage.append(el('div','globe-journey',`✦ ${path}`));}
   if ($('#map-caption-text')) $('#map-caption-text').textContent = loc.discovery;
   if ($('#map-coordinates')) $('#map-coordinates').textContent = loc.coordinates;
@@ -61,6 +68,34 @@ function renderMap() {
   if ($('#crumb-name')) $('#crumb-name').textContent = title.toUpperCase();
   if ($('#round-number')) $('#round-number').textContent = String(Math.min(state.round + 1, 3)).padStart(2, '0');
   if ($('#round-prompt')) $('#round-prompt').textContent = state.round >= 3 && state.resolved ? 'Trip complete! Chat chose the destinations.' : roundData().prompt;
+}
+function globePoint(lat, lon, cx, cy, radius) {
+  const phi=lat*Math.PI/180, delta=(lon-globeView.longitude)*Math.PI/180, tilt=globeView.latitude*Math.PI/180;
+  const x=Math.cos(phi)*Math.sin(delta), y=Math.sin(phi)*Math.cos(tilt)-Math.cos(phi)*Math.cos(delta)*Math.sin(tilt), z=Math.sin(phi)*Math.sin(tilt)+Math.cos(phi)*Math.cos(delta)*Math.cos(tilt);
+  return {x:cx+x*radius,y:cy-y*radius,z};
+}
+function renderInteractiveGlobe(canvas) {
+  const rect=canvas.getBoundingClientRect(); if(!rect.width||!rect.height)return;
+  const dpr=Math.min(window.devicePixelRatio||1,2); canvas.width=Math.round(rect.width*dpr); canvas.height=Math.round(rect.height*dpr);
+  const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,rect.width,rect.height);
+  const cx=rect.width/2,cy=rect.height/2+5,r=Math.min(rect.width*.38,rect.height*.39,205);
+  ctx.save(); ctx.shadowColor='rgba(62,193,178,.22)';ctx.shadowBlur=30;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);const ocean=ctx.createRadialGradient(cx-r*.35,cy-r*.42,r*.05,cx,cy,r*1.15);ocean.addColorStop(0,'#367f83');ocean.addColorStop(.52,'#195563');ocean.addColorStop(1,'#071d2b');ctx.fillStyle=ocean;ctx.fill();ctx.restore();
+  ctx.save();ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.clip();
+  ctx.strokeStyle='rgba(184,225,219,.19)';ctx.lineWidth=.7;
+  for(let lat=-60;lat<=60;lat+=30){let drawing=false;ctx.beginPath();for(let lon=-180;lon<=180;lon+=3){const p=globePoint(lat,lon,cx,cy,r);if(p.z>0){if(!drawing){ctx.moveTo(p.x,p.y);drawing=true;}else ctx.lineTo(p.x,p.y);}else drawing=false;}ctx.stroke();}
+  for(let lon=-180;lon<180;lon+=30){let drawing=false;ctx.beginPath();for(let lat=-88;lat<=88;lat+=2){const p=globePoint(lat,lon,cx,cy,r);if(p.z>0){if(!drawing){ctx.moveTo(p.x,p.y);drawing=true;}else ctx.lineTo(p.x,p.y);}else drawing=false;}ctx.stroke();}
+  landShapes.forEach(shape=>{ctx.beginPath();let active=false,started=false;for(const [lon,lat] of shape){const p=globePoint(lat,lon,cx,cy,r);if(p.z>0){if(!active){ctx.moveTo(p.x,p.y);active=true;started=true;}else ctx.lineTo(p.x,p.y);}else active=false;}if(started){ctx.closePath();ctx.fillStyle='#83a976';ctx.fill();ctx.strokeStyle='rgba(202,220,165,.5)';ctx.lineWidth=.8;ctx.stroke();}});
+  countries.forEach(c=>{const p=globePoint(c.lat,c.lon,cx,cy,r);if(p.z<=0)return;const visited=state.history.some(h=>h.id===c.id),current=state.history.at(-1)?.id===c.id;ctx.beginPath();ctx.arc(p.x,p.y,current?6:visited?4.3:3.5,0,Math.PI*2);ctx.fillStyle=current?'#fff1c4':visited?'#a7ddbf':'#e6ad65';ctx.shadowColor=current?'#fff1c4':'#ffca70';ctx.shadowBlur=current?14:8;ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='#fff0c5';ctx.lineWidth=1;ctx.stroke();});
+  const shine=ctx.createLinearGradient(cx-r,cy-r,cx+r*.8,cy+r*.3);shine.addColorStop(0,'rgba(255,255,255,.22)');shine.addColorStop(.38,'rgba(255,255,255,0)');shine.addColorStop(1,'rgba(0,0,0,.42)');ctx.fillStyle=shine;ctx.fillRect(cx-r,cy-r,r*2,r*2);ctx.restore();
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle='rgba(198,235,222,.52)';ctx.lineWidth=1.2;ctx.stroke();
+  if(!canvas.dataset.interactive){canvas.dataset.interactive='true';let drag=null;
+    canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,lng:globeView.longitude,lat:globeView.latitude,moved:false};canvas.setPointerCapture(e.pointerId);canvas.style.cursor='grabbing';});
+    canvas.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;if(drag.moved){globeView.longitude=drag.lng-dx*.45;globeView.latitude=Math.max(-70,Math.min(70,drag.lat+dy*.35));renderInteractiveGlobe(canvas);}});
+    canvas.addEventListener('pointerup',e=>{if(!drag)return;const moved=drag.moved;canvas.releasePointerCapture(e.pointerId);canvas.style.cursor='grab';if(!moved){const bounds=canvas.getBoundingClientRect(),x=e.clientX-bounds.left,y=e.clientY-bounds.top,rr=Math.min(bounds.width*.38,bounds.height*.39,205),mx=bounds.width/2,my=bounds.height/2+5;const chosen=countries.map(c=>({c,p:globePoint(c.lat,c.lon,mx,my,rr)})).filter(v=>v.p.z>0).sort((a,b)=>Math.hypot(a.p.x-x,a.p.y-y)-Math.hypot(b.p.x-x,b.p.y-y))[0];if(chosen&&Math.hypot(chosen.p.x-x,chosen.p.y-y)<17){if(state.ws?.readyState===WebSocket.OPEN)setToast(`Vote for ${chosen.c.name} in Twitch chat with !vote ${countries.indexOf(chosen.c)+1}`);else{vote('you',chosen.c.id);setToast(`Demo vote: ${chosen.c.name}`);}}}drag=null;});
+    canvas.addEventListener('pointercancel',()=>{drag=null;canvas.style.cursor='grab';});
+    canvas.addEventListener('keydown',e=>{const step=e.shiftKey?18:8;if(e.key==='ArrowLeft')globeView.longitude-=step;else if(e.key==='ArrowRight')globeView.longitude+=step;else if(e.key==='ArrowUp')globeView.latitude=Math.min(70,globeView.latitude+step);else if(e.key==='ArrowDown')globeView.latitude=Math.max(-70,globeView.latitude-step);else if(e.key==='Home'){globeView.longitude=-15;globeView.latitude=12;}else return;e.preventDefault();renderInteractiveGlobe(canvas);});
+    if(globeView.observer)globeView.observer.disconnect();globeView.observer=new ResizeObserver(()=>renderInteractiveGlobe(canvas));globeView.observer.observe(canvas);
+  }
 }
 function addMapNode(stage, x, y, label, active, discovered, you = false) { const node = el('div', `map-node ${active ? 'active' : ''} ${discovered ? 'discovered' : ''} ${you ? 'you-are-here' : ''}`); node.style.left = `${x}%`; node.style.top = `${y}%`; node.append(el('span', 'node-pin', you ? '✳' : '')); const text = el('span', 'node-label', label); node.append(text); if (you) node.append(el('span', 'node-you', 'YOU ARE HERE')); stage.append(node); }
 function render() {
