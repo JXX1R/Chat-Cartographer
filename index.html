@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0e1419" />
+    <title>Chat Cartographer — A journey drawn by chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#" aria-label="Chat Cartographer home"><span class="brand-mark">⌖</span><span>chat<span class="brand-accent">cartographer</span></span></a>
+        <div class="sidebar-label">YOUR EXPEDITION</div>
+        <button class="nav-item active" data-view="map"><span>◈</span> Expedition map</button>
+        <button class="nav-item" data-view="setup"><span>⚙</span> Streamer setup</button>
+        <div class="sidebar-spacer"></div>
+        <div class="sidebar-note"><span class="live-dot"></span><div><strong>Ready when you are</strong><small>Your next story starts with chat.</small></div></div>
+        <div class="sidebar-foot">MADE FOR THE MOMENTS<br />YOU MAKE TOGETHER</div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar"><div class="crumb"><span>EXPEDITIONS</span><b>/</b><strong id="crumb-name">THE SUNKEN ARCHIVE</strong></div><div class="top-actions"><span class="mode-pill"><i></i><span id="connection-label">DEMO MODE</span></span><button class="avatar" title="Streamer profile">✦</button></div></header>
+        <section class="view active" id="map-view">
+          <div class="page-heading"><div><p class="eyebrow">A COMMUNITY-DRAWN ADVENTURE</p><h1 id="expedition-title">The Sunken Archive</h1><p class="subheading">Every vote charts a new course. Where will chat lead you?</p></div><button class="button button-quiet" id="reset-button">↻ <span>Reset expedition</span></button></div>
+
+          <div class="content-grid">
+            <section class="map-card panel">
+              <div class="panel-top"><div><span class="section-kicker">YOUR WORLD</span><h2>Expedition map</h2></div><div class="map-legend"><span><i class="legend-here"></i> YOU ARE HERE</span><span><i class="legend-next"></i> NEXT ROUTE</span></div></div>
+              <div class="map-stage" id="map-stage" aria-label="Branching expedition map"></div>
+              <div class="map-caption"><span>✳</span><p id="map-caption-text">A hand-drawn map of places only your community can discover.</p><span class="coordinates" id="map-coordinates">N 04° · E 17°</span></div>
+            </section>
+
+            <aside class="round-column">
+              <section class="round-card panel">
+                <div class="round-top"><div><span class="section-kicker">ROUND <span id="round-number">01</span></span><h2>Choose your path</h2></div><span class="vote-live"><i></i> VOTING OPEN</span></div>
+                <p class="round-prompt" id="round-prompt">Three paths disappear into the mist. Which one should we explore?</p>
+                <div class="choice-list" id="choice-list"></div>
+                <div class="timer-row"><span>VOTING CLOSES IN</span><strong id="countdown">00:30</strong></div>
+                <div class="progress-track"><span id="timer-progress"></span></div>
+                <div class="round-footer"><span id="voter-count">0 explorers have voted</span><button class="button button-primary" id="resolve-button">Reveal the route <span>↗</span></button></div>
+              </section>
+              <section class="chat-card panel">
+                <div class="chat-heading"><div><span class="section-kicker">FROM THE COMMUNITY</span><h2>Chat activity</h2></div><span class="chat-live"><i></i> LIVE</span></div>
+                <div class="chat-feed" id="chat-feed" aria-live="polite"></div>
+                <form class="chat-input" id="vote-form"><span class="chat-prefix">CHAT</span><input id="vote-input" placeholder="Try !vote 1" autocomplete="off" aria-label="Simulate a chat vote" /><button title="Send simulated vote">↗</button></form>
+                <p class="chat-hint">Demo mode · Send a vote as a viewer</p>
+              </section>
+            </aside>
+          </div>
+          <footer class="page-footer"><span>THE MAP GROWS WITH EVERY STREAM</span><button id="overlay-link">↗ Open stream overlay</button></footer>
+        </section>
+
+        <section class="view" id="setup-view">
+          <div class="page-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h1>Streamer setup</h1><p class="subheading">Shape the expedition and bring your community aboard.</p></div></div>
+          <div class="setup-grid">
+            <section class="panel setup-panel"><span class="section-kicker">01 / YOUR EXPEDITION</span><h2>Set the scene</h2><label class="field-label" for="setup-title">Expedition name</label><input class="text-field" id="setup-title" value="The Sunken Archive" maxlength="36"/><label class="field-label" for="theme-select">Map theme</label><select class="text-field" id="theme-select"><option value="archive">The Sunken Archive</option><option value="wilds">Whispering Wilds</option><option value="cosmos">The Faraway Cosmos</option></select><label class="field-label" for="round-duration">Voting round</label><select class="text-field" id="round-duration"><option value="30">30 seconds · quick pace</option><option value="45">45 seconds · more time to chat</option><option value="60">60 seconds · big community</option></select><button class="button button-primary wide-button" id="save-setup">Save expedition settings <span>↗</span></button></section>
+            <section class="panel setup-panel"><span class="section-kicker">02 / CONNECT TO TWITCH</span><h2>Bring chat along</h2><p class="setup-copy">Connect your Twitch account to listen for live votes in your channel. The app owner configures the Client ID once; your access token stays in this browser.</p><label class="field-label" for="client-id">Twitch application Client ID</label><input class="text-field" id="client-id" placeholder="Configured by the app owner" autocomplete="off"/><label class="field-label" for="channel-name">Channel login</label><input class="text-field" id="channel-name" placeholder="your_channel_name" autocomplete="off"/><button class="button button-dark wide-button" id="connect-twitch">Connect Twitch <span>↗</span></button><div class="connect-state" id="twitch-status"><i></i><span>Demo mode active. Connect any time.</span></div><p class="setup-footnote">The app owner registers one app in the <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noreferrer">Twitch Developer Console</a> and sets its HTTPS redirect URL.</p></section>
+            <section class="panel setup-panel routes-panel"><div class="route-head"><div><span class="section-kicker">03 / THE WORLD</span><h2>Route library</h2></div><button class="button button-quiet" id="download-routes">↓ Export JSON</button></div><p class="setup-copy">Edit <code>data/routes.json</code> to add destinations, route choices, and discoveries to your world.</p><div class="route-preview" id="route-preview"></div></section>
+            <section class="panel setup-panel"><span class="section-kicker">04 / FOR YOUR STREAM</span><h2>Overlay link</h2><p class="setup-copy">Add this browser source to OBS to show the map and voting on stream.</p><div class="url-box"><span id="overlay-url"></span><button id="copy-overlay" title="Copy overlay URL">▢</button></div><button class="button button-quiet" id="preview-overlay">Preview overlay ↗</button><p class="setup-footnote">Overlay is transparent and sized for a 1920 × 1080 canvas.</p></section>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
+
